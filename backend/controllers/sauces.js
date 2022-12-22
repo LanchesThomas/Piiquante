@@ -1,6 +1,5 @@
 const Sauce = require('../models/sauces');
 const fs = require('fs');
-const { update } = require('../models/sauces');
 
 // find all sauces
 exports.Sauces = (req, res, next) => {
@@ -55,11 +54,28 @@ exports.updateSauce = (req, res, next) => {
             if (sauce.userId != req.auth.userId) {
                 res.status(401).json({ message: 'Non-autorisé' });
             } else {
-                Sauce.updateOne({ _id: req.params.id }, { ...sauceObject })
-                    .then(() =>
-                        res.status(201).json({ message: 'Objet Modifié' })
-                    )
-                    .catch((error) => res.status(401).json({ error }));
+                // if photo not updated
+                if (req.file == null) {
+                    Sauce.updateOne({ _id: req.params.id }, { ...sauceObject })
+                        .then(() =>
+                            res.status(201).json({ message: 'Objet Modifié' })
+                        )
+                        .catch((error) => res.status(401).json({ error }));
+                } else { // if photo updated
+                    const filename = sauce.imageUrl.split('/images/')[1];
+                    fs.unlink(`images/${filename}`, () => {
+                        Sauce.updateOne(
+                            { _id: req.params.id },
+                            { ...sauceObject }
+                        )
+                            .then(() =>
+                                res
+                                    .status(201)
+                                    .json({ message: 'Objet Modifié' })
+                            )
+                            .catch((error) => res.status(401).json({ error }));
+                    });
+                }
             }
         })
         .catch((error) => res.status(400).json({ error }));
@@ -72,7 +88,8 @@ exports.deleteSauce = (req, res, next) => {
             if (sauce.userId != req.auth.userId) {
                 res.status(401).json({ message: 'non autorisé' });
             } else {
-                fs.unlink(`/sauces/${req.params.id}`, () => {
+                const filename = sauce.imageUrl.split('/images/')[1];
+                fs.unlink(`images/${filename}`, () => {
                     Sauce.deleteOne({ _id: req.params.id })
                         .then(() =>
                             res
@@ -141,7 +158,7 @@ exports.likeSauce = (req, res, next) => {
                 if (findUsersLiked) {
                     sauce.likes--;
                     sauce.usersLiked.splice(
-                        sauce.usersDisliked.indexOf(req.body.userId),
+                        sauce.usersLiked.indexOf(req.body.userId),
                         1
                     );
                     sauce
